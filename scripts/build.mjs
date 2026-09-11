@@ -15,9 +15,22 @@ if (upstream.version !== pdfPackage.version) throw new Error("The standard viewe
 const upstreamHTML = await readFile("vendor/pdfjs/web/viewer.html", "utf8");
 const upstreamJS = await readFile("vendor/pdfjs/web/viewer.mjs", "utf8");
 const upstreamCSS = await readFile("vendor/pdfjs/web/viewer.css", "utf8");
+function replaceOnce(text, before, after) {
+  if (text.split(before).length !== 2) throw new Error(`Upstream viewer changed: ${before}`);
+  return text.replace(before, after);
+}
+// The bridge listens in the extension frame. Accessing Brightspace's parent
+// document is cross-origin and makes upstream log a caught SecurityError.
+const viewerJS = replaceOnce(upstreamJS, `  try {
+    parent.document.dispatchEvent(event);
+  } catch (ex) {
+    console.error("webviewerloaded:", ex);
+    document.dispatchEvent(event);
+  }`, `  // Modified by DTU PDF Search: dispatch startup inside the extension frame.
+  document.dispatchEvent(event);`);
 // New HTML, JS and CSS always travel together, even when a browser keeps extension
 // resources cached across a temporary add-on reload.
-const revision = createHash("sha256").update(JSON.stringify({ viewerSources, upstreamHTML, upstreamJS, upstreamCSS, pdfVersion: pdfPackage.version })).digest("hex").slice(0, 12);
+const revision = createHash("sha256").update(JSON.stringify({ viewerSources, upstreamHTML, viewerJS, upstreamCSS, pdfVersion: pdfPackage.version })).digest("hex").slice(0, 12);
 const viewerPage = `vendor/web/viewer.${revision}.html`;
 
 for (const browser of ["chrome", "firefox"]) {
@@ -48,10 +61,6 @@ for (const browser of ["chrome", "firefox"]) {
   });
   await cp("vendor/pdfjs/web", `${dest}/vendor/web`, { recursive: true });
   await rm(`${dest}/vendor/web/viewer.html`);
-  function replaceOnce(text, before, after) {
-    if (text.split(before).length !== 2) throw new Error(`Upstream viewer changed: ${before}`);
-    return text.replace(before, after);
-  }
   let html = replaceOnce(upstreamHTML, '<title>PDF.js viewer</title>', '<title>DTU PDF Search</title>');
   html = replaceOnce(html, 'src="viewer.mjs"', `src="bridge.${revision}.js"`);
   html = replaceOnce(html, 'href="viewer.css"', `href="viewer.${revision}.css"`);
@@ -62,7 +71,7 @@ for (const browser of ["chrome", "firefox"]) {
       <button id="useOriginal" class="toolbarButton labeled" type="button"><span>Use original viewer</span></button>`);
   await writeFile(`${dest}/${viewerPage}`, html);
   await writeFile(`${dest}/vendor/web/bridge.${revision}.js`, replaceOnce(viewerSources["viewer.js"], './viewer.mjs', `./viewer.${revision}.mjs`));
-  await writeFile(`${dest}/vendor/web/viewer.${revision}.mjs`, upstreamJS);
+  await writeFile(`${dest}/vendor/web/viewer.${revision}.mjs`, viewerJS);
   await rm(`${dest}/vendor/web/viewer.mjs`);
   await writeFile(`${dest}/vendor/web/bridge.${revision}.css`, viewerSources["viewer.css"]);
   await writeFile(`${dest}/vendor/web/viewer.${revision}.css`, upstreamCSS);

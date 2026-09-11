@@ -49,10 +49,13 @@ test.afterAll(async () => {
   if (profile) await rm(profile, { recursive: true, force: true });
 });
 
-async function openFixture({ failed = false, fallback = false, nested = false, trustedTypes = false, nativeLifecycle = false, padded = false } = {}) {
+async function openFixture({ failed = false, fallback = false, nested = false, trustedTypes = false, nativeLifecycle = false, padded = false, pdfData = pdf } = {}) {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error" && message.text().includes("webviewerloaded:")) errors.push(message.text());
+  });
   // No requests reach DTU: both the portal and its session-protected PDFs are fixtures.
   await page.route(`${origin}/**`, async route => {
     const url = new URL(route.request().url());
@@ -61,7 +64,7 @@ async function openFixture({ failed = false, fallback = false, nested = false, t
       if (failed || (fallback && url.pathname.startsWith("/content/enforced/"))) {
         return route.fulfill({ status: failed ? 403 : 200, contentType: "text/html", body: "Sign in" });
       }
-      return route.fulfill({ contentType: "application/pdf", body: url.pathname.includes("second") ? makePDF(5, "Replacement document") : pdf });
+      return route.fulfill({ contentType: "application/pdf", body: url.pathname.includes("second") ? makePDF(5, "Replacement document") : pdfData });
     }
     const content = `<div class="content-panel" id="d2l_content_326354_1260091" data-attr-activity-type="file">
       <h1>Lecture 1</h1><d2l-pdf-viewer src="/content/enforced/326354-course/lecture.pdf" style="display:block;height:600px">Original Brightspace viewer</d2l-pdf-viewer></div>`;
@@ -162,9 +165,13 @@ test("Ctrl+F finds and highlights page 40 without visiting it; supports navigati
 });
 
 test("standard sidebar, download and safe startup settings work", async ({}, info) => {
-  const { page, errors } = await openFixture();
+  const pdfData = makePDF(40, "Distant quasar needle", { pageMode: "UseThumbs" });
+  const { page, errors } = await openFixture({ pdfData });
   const pdfFrame = viewer(page);
   await expect(pdfFrame.locator("#scaleSelect")).toHaveValue("page-width");
+  await expect.poll(() => pdfFrame.locator("body").evaluate(() => window.PDFViewerApplication.viewsManager.isInitialViewSet)).toBe(true);
+  await expect(pdfFrame.locator("#viewsManager")).toBeHidden();
+  await expect(pdfFrame.locator("#viewsManagerToggleButton")).toHaveAttribute("aria-expanded", "false");
   await pdfFrame.locator("#viewsManagerToggleButton").click();
   await expect(pdfFrame.locator("#viewsManager")).toBeVisible();
   await expect(pdfFrame.locator("#thumbnailsView img").first()).toBeVisible();
@@ -174,7 +181,7 @@ test("standard sidebar, download and safe startup settings work", async ({}, inf
   await pdfFrame.locator("#downloadButton").click();
   const download = await downloaded;
   expect(download.suggestedFilename()).toBe("lecture.pdf");
-  expect(await readFile(await download.path())).toEqual(pdf);
+  expect(await readFile(await download.path())).toEqual(pdfData);
   expect(await pdfFrame.locator("body").evaluate(() => {
     const options = window.PDFViewerApplicationOptions;
     return [options.get("enableScripting"), options.get("enableXfa"), options.get("annotationEditorMode")];

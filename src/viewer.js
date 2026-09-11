@@ -20,6 +20,8 @@ document.addEventListener("webviewerloaded", () => {
   window.PDFViewerApplicationOptions.setAll({
     defaultUrl: "", disablePreferences: true, disableHistory: true,
     defaultZoomValue: "page-width", viewOnLoad: 1,
+    // Start closed even when the PDF requests thumbnails or an outline on open.
+    sidebarViewOnLoad: 0,
     enableScripting: false, enableXfa: false,
     annotationEditorMode: -1, annotationMode: 1,
     enableAltTextModelDownload: false, enableSignatureVerification: false,

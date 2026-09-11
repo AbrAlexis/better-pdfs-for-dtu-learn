@@ -1,6 +1,6 @@
 # DTU PDF Search
 
-A browser extension for **Chrome and Firefox** that replaces the PDF viewer inside [DTU Learn](https://learn.inside.dtu.dk) with Mozilla’s locally bundled standard PDF.js viewer. This branch (`experiment/standard-pdfjs-viewer`) replaces the custom toolbar with the upstream interface; the custom viewer remains on `main`. **Ctrl+F / Cmd+F searches the entire PDF**, including pages you have never scrolled to, and highlights and navigates between matches.
+A browser extension for **Chrome and Firefox** that replaces the PDF viewer inside [DTU Learn](https://learn.inside.dtu.dk) with Mozilla’s locally bundled standard PDF.js viewer. **Ctrl+F / Cmd+F searches the entire PDF**, including pages you have never scrolled to, and highlights and navigates between matches.
 
 ## Try the built extension
 
@@ -89,4 +89,4 @@ PDF.js is licensed under Apache-2.0. Its license and asset notices are included 
 
 `vendor/pdfjs/web` contains unmodified viewer files, icons, and translations from the official PDF.js **6.3.289 legacy distribution**. `vendor/pdfjs/UPSTREAM.json` records the download URL and archive SHA-256. These files are checked in so ordinary builds require no separate download. Core PDF.js, its worker, fonts, CMaps, and decoding assets still come from the pinned `pdfjs-dist` npm dependency.
 
-When updating, update both sources to the same version; the build rejects mismatches. Verify the downloaded archive, replace the vendored files, update provenance, and run the browser tests. The build checks the HTML insertion points. The bridge also uses PDF.js's application options, find-bar API, and auto-print hook, which need review on upgrades. No upstream viewer source files are patched in place.
+When updating, update both sources to the same version; the build rejects mismatches. Verify the downloaded archive, replace the vendored files, update provenance, and run the browser tests. The build checks the HTML insertion points and modifies the generated viewer to dispatch its startup event locally, avoiding cross-origin access to the Brightspace parent document. The bridge also uses PDF.js's application options, find-bar API, and auto-print hook, which need review on upgrades. No upstream viewer source files are patched in place.

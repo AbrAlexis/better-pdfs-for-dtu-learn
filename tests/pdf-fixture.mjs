@@ -1,7 +1,7 @@
 // A real PDF whose last-page phrase cannot be found by searching rendered page 1.
-export function makePDF(pages = 40, lastPageText = "Distant quasar needle") {
+export function makePDF(pages = 40, lastPageText = "Distant quasar needle", { pageMode } = {}) {
   const objects = [];
-  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
+  objects[1] = `<< /Type /Catalog /Pages 2 0 R ${pageMode ? `/PageMode /${pageMode}` : ""} >>`;
   objects[2] = `<< /Type /Pages /Count ${pages} /Kids [${Array.from({ length: pages }, (_, i) => `${4 + i * 2} 0 R`).join(" ")}] >>`;
   objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>";
   for (let i = 0; i < pages; i++) {

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DTU PDF Search",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Search every page of a PDF directly inside DTU Learn.",
   "content_scripts": [{
     "matches": ["https://learn.inside.dtu.dk/*"],
