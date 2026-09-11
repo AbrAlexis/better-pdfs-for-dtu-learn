@@ -26,7 +26,7 @@ const viewerJS = replaceOnce(upstreamJS, `  try {
   } catch (ex) {
     console.error("webviewerloaded:", ex);
     document.dispatchEvent(event);
-  }`, `  // Modified by DTU PDF Search: dispatch startup inside the extension frame.
+  }`, `  // Modified by Better PDFs for DTU Learn: dispatch startup inside the extension frame.
   document.dispatchEvent(event);`);
 // New HTML, JS and CSS always travel together, even when a browser keeps extension
 // resources cached across a temporary add-on reload.
@@ -45,7 +45,7 @@ for (const browser of ["chrome", "firefox"]) {
   if (browser === "firefox") {
     browserManifest.browser_specific_settings = {
       gecko: {
-        id: "dtu-pdf-search@dtu-pdf-search.local",
+        id: "better-pdfs-for-dtu-learn@extension.local",
         strict_min_version: "140.0",
         data_collection_permissions: { required: ["none"] }
       },
@@ -65,7 +65,7 @@ for (const browser of ["chrome", "firefox"]) {
   });
   await cp("vendor/pdfjs/web", `${dest}/vendor/web`, { recursive: true });
   await rm(`${dest}/vendor/web/viewer.html`);
-  let html = replaceOnce(upstreamHTML, '<title>PDF.js viewer</title>', '<title>DTU PDF Search</title>');
+  let html = replaceOnce(upstreamHTML, '<title>PDF.js viewer</title>', '<title>Better PDFs for DTU Learn</title>');
   html = replaceOnce(html, 'src="viewer.mjs"', `src="bridge.${revision}.js"`);
   html = replaceOnce(html, 'href="viewer.css"', `href="viewer.${revision}.css"`);
   html = replaceOnce(html, '</head>', `<link rel="stylesheet" href="bridge.${revision}.css" /></head>`);
@@ -98,6 +98,6 @@ for (const browser of ["chrome", "firefox"]) {
   }
   await collect(dest);
   await mkdir("artifacts", { recursive: true });
-  await writeFile(`artifacts/dtu-pdf-search-${browser}-${pkg.version}.zip`, zipSync(files));
-  console.log(`Built ${dest} and artifacts/dtu-pdf-search-${browser}-${pkg.version}.zip`);
+  await writeFile(`artifacts/better-pdfs-for-dtu-learn-${browser}-${pkg.version}.zip`, zipSync(files));
+  console.log(`Built ${dest} and artifacts/better-pdfs-for-dtu-learn-${browser}-${pkg.version}.zip`);
 }

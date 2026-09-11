@@ -20,7 +20,7 @@ This project does not have a signed store release yet. Build output is available
 
 ### Chrome
 
-1. Extract `artifacts/dtu-pdf-search-chrome-0.2.0.zip`.
+1. Extract `artifacts/better-pdfs-for-dtu-learn-chrome-0.2.0.zip`.
 2. Open `chrome://extensions`.
 3. Enable **Developer mode**.
 4. Click **Load unpacked** and select the extracted folder.
@@ -30,7 +30,7 @@ This project does not have a signed store release yet. Build output is available
 
 1. Open `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on…**.
-3. Select `artifacts/dtu-pdf-search-firefox-0.2.0.zip`.
+3. Select `artifacts/better-pdfs-for-dtu-learn-firefox-0.2.0.zip`.
 4. Refresh DTU Learn and open a PDF.
 
 Firefox removes temporary add-ons when it restarts. A permanent installation requires a package signed by Mozilla.

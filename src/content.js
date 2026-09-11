@@ -203,7 +203,7 @@ import { PORTAL_ORIGIN, documentSources, fetchPDF } from "./document-source.js";
         </details>
       </div>`;
     const frame = document.createElement("iframe");
-    frame.title = "Searchable PDF — DTU PDF Search";
+    frame.title = "PDF — Better PDFs for DTU Learn";
     const token = crypto.randomUUID();
     shadow.append(frame);
     const original = prefersOriginal(key);
@@ -267,7 +267,7 @@ import { PORTAL_ORIGIN, documentSources, fetchPDF } from "./document-source.js";
         }
       } else if (event.data.type === "dtu-pdf-loaded") {
         clearTimeout(record.timeout);
-        record.status.textContent = "DTU PDF Search · Search all pages";
+        record.status.textContent = "Better PDFs for DTU Learn";
       } else if (event.data.type === "dtu-pdf-error") {
         fail(record, "The PDF could not be opened. You can use the original viewer or retry.");
       } else if (event.data.type === "dtu-pdf-original") {
