@@ -1,6 +1,6 @@
 # DTU PDF Search
 
-A browser extension for **Chrome and Firefox** that replaces the PDF viewer inside [DTU Learn](https://learn.inside.dtu.dk) with a locally bundled PDF.js viewer. **Ctrl+F / Cmd+F searches the entire PDF**, including pages you have never scrolled to, and highlights and navigates between matches.
+A browser extension for **Chrome and Firefox** that replaces the PDF viewer inside [DTU Learn](https://learn.inside.dtu.dk) with Mozilla’s locally bundled standard PDF.js viewer. This branch (`experiment/standard-pdfjs-viewer`) replaces the custom toolbar with the upstream interface; the custom viewer remains on `main`. **Ctrl+F / Cmd+F searches the entire PDF**, including pages you have never scrolled to, and highlights and navigates between matches.
 
 ## Try the built extension
 
@@ -26,14 +26,14 @@ Desktop targets: Chrome 132+ and Firefox 140+. The PDF.js compatibility build is
 
 ## Use
 
-- Press **Ctrl+F** (or **Cmd+F** on macOS), or click the **search icon**. Search opens within the compact, single-row toolbar. Press the shortcut again to close it; your search text is preserved when reopening.
+- Press **Ctrl+F** (or **Cmd+F** on macOS), or click the **search icon**. Search opens in PDF.js’s standard find bar below the toolbar. Press the shortcut again to close it; your search text is preserved when reopening.
 - Type a phrase. Search processes text from all pages independently of rendering; the first search can take longer for a large PDF.
-- Press **Enter** / **Shift+Enter** to move between matches. Case-sensitive and whole-word searches are available.
+- Press **Enter** / **Shift+Enter** to move between matches. Highlight all, case-sensitive, whole-word, and diacritic-sensitive searches are available.
 - Press **Escape** to close search. Page navigation and zoom controls remain available.
-- The **⋯ menu** contains **Use original viewer**, which reloads the lesson with Brightspace's viewer visible from startup so its renderer can initialize at the correct size. In original mode, the menu offers **Use searchable viewer** to switch back without reloading. Reloading resets the document's scroll position.
+- The **Tools (») menu** at the right of the toolbar contains **Use original viewer**, which reloads the lesson with Brightspace's viewer visible from startup so its renderer can initialize at the correct size. In original mode, the menu offers **Use searchable viewer** to switch back without reloading. Reloading resets the document's scroll position.
 - **Open PDF in new tab**, also in the ⋯ menu, opens the original file using your existing DTU session.
 
-On narrow viewers, opening search temporarily hides zoom controls and, at smaller widths, page controls to keep the toolbar on one row. Close search to bring those controls back. The **Aa** and **W** toggles enable case-sensitive and whole-word matching.
+The standard toolbar includes a thumbnails/outline sidebar, page navigation, zoom, printing, downloading, and a Tools menu with rotation and layout controls. PDF.js handles its responsive layout and translations. Annotation editing and PDF scripting remain disabled. The local-file opener and file drops are disabled so the embedded viewer stays attached to the lesson document.
 
 The viewer fills the remaining browser height below its toolbar, reserving room for surrounding page padding so it does not create a small outer scrollbar. It adjusts when the window resizes, including when Brightspace embeds the lesson in another frame. Scrolling the surrounding page does not grow the viewer.
 
@@ -54,11 +54,11 @@ npm run lint:firefox
 
 `npm run check` runs the build, unit tests, browser tests, and Firefox package validation. Playwright needs the browser system libraries for your OS. To store test browsers outside its default cache, set the same `PLAYWRIGHT_BROWSERS_PATH` when installing and running them.
 
-After rebuilding, reload the add-on in the browser's extension manager and refresh the DTU tab. Viewer HTML, CSS, and JavaScript receive content-based filenames so browser caches cannot pair a new toolbar with an old stylesheet. Each build recreates the generated `dist/chrome` and `dist/firefox` folders.
+After rebuilding, reload the add-on in the browser's extension manager and refresh the DTU tab. Viewer HTML, CSS, JavaScript, and our bridge receive content-based filenames so browser caches cannot pair a new toolbar with an old stylesheet. Each build recreates the generated `dist/chrome` and `dist/firefox` folders.
 
 The browser tests install the **actual extension** in isolated Chrome and Firefox profiles. They intercept the DTU hostname and serve a simulated portal and generated PDFs; they do not use your DTU account or contact DTU for fixture content. Tests cover a match on page 40 before that page renders, match navigation, zoom, authenticated fetching, API fallback, source changes, failure recovery, nested frames, and shadow roots.
 
-Firefox's linter reports warnings in the unmodified PDF.js compatibility libraries (dynamic imports and legacy polyfills using `Function`/DOM writes). These are third-party warnings, not validation errors. The extension disables PDF.js evaluation, does not enable PDF scripting, and its content security policy blocks JavaScript `eval`. Revisit the warnings when updating PDF.js or preparing a store submission.
+Firefox's linter reports warnings in the unmodified PDF.js compatibility libraries (dynamic imports and legacy polyfills using `Function`/DOM writes). These are third-party warnings, not validation errors. The extension disables PDF scripting, and its content security policy blocks JavaScript `eval` and the `Function` constructor. Revisit the warnings when updating PDF.js or preparing a store submission.
 
 ## How it works
 
@@ -69,13 +69,13 @@ Firefox's linter reports warnings in the unmodified PDF.js compatibility librari
 5. PDF.js's `PDFFindController` extracts and searches all pages. Its `PDFViewer` renders pages as needed and handles match highlighting and scrolling.
 6. A DOM observer handles topic changes; a periodic check catches late shadow-root attachment. Removed viewers have their requests aborted. Failed loads restore the original viewer.
 
-`src/content.js` handles Brightspace integration, `src/document-source.js` locates and loads PDFs, and `src/viewer.*` implements the viewer. `scripts/build.mjs` bundles the content script, copies pinned PDF.js assets and licenses, and generates browser-specific packages.
+`src/content.js` handles Brightspace integration, `src/document-source.js` locates and loads PDFs. `src/viewer.js` connects the standard viewer to the extension, and `src/viewer.css` contains small integration overrides. The build derives the viewer HTML from Mozilla’s template and adds our two Tools menu actions. `scripts/build.mjs` bundles the content script, copies pinned PDF.js assets and licenses, and generates browser-specific packages.
 
 ## Privacy and current limits
 
 PDFs are fetched into browser memory and processed locally. There is no backend, telemetry, external PDF service, saved search history, or request for access to other websites. A session-storage entry remembers which document should use the original viewer in this tab; switching back to search clears it. No broad host permissions, cookie-reading API, or background process is required. The viewer only receives PDF bytes, not session cookies.
 
-- This first version targets the DTU structure shown in the supplied screenshot. It still needs a manual check in a real signed-in DTU lesson.
+- The custom viewer was manually tested in DTU Learn. This standard-viewer branch still needs a manual check in a real signed-in lesson; automated tests use simulated portal pages.
 - Search needs PDF text. Image-only scans require OCR, which is outside this version.
 - Password-protected or unsupported PDFs fall back to the original viewer.
 - The complete PDF is loaded before viewing. Very large files use additional memory and may take longer to open.
@@ -84,3 +84,9 @@ PDFs are fetched into browser memory and processed locally. There is no backend,
 - The extension uses the observed `src` and panel-ID conventions, with API version `1.38` as a fallback. Future portal changes may require updating detection.
 
 PDF.js is licensed under Apache-2.0. Its license and asset notices are included in each build.
+
+## Updating the standard viewer
+
+`vendor/pdfjs/web` contains unmodified viewer files, icons, and translations from the official PDF.js **6.3.289 legacy distribution**. `vendor/pdfjs/UPSTREAM.json` records the download URL and archive SHA-256. These files are checked in so ordinary builds require no separate download. Core PDF.js, its worker, fonts, CMaps, and decoding assets still come from the pinned `pdfjs-dist` npm dependency.
+
+When updating, update both sources to the same version; the build rejects mismatches. Verify the downloaded archive, replace the vendored files, update provenance, and run the browser tests. The build checks the HTML insertion points. The bridge also uses PDF.js's application options, find-bar API, and auto-print hook, which need review on upgrades. No upstream viewer source files are patched in place.

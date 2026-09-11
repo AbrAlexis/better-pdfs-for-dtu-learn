@@ -1,0 +1,6 @@
+{
+  "version": "6.3.289",
+  "url": "https://github.com/mozilla/pdf.js/releases/download/v6.3.289/pdfjs-6.3.289-legacy-dist.zip",
+  "sha256": "51683fac4aff7dd31ed91e9ab735a2098a78d50899d1ec529aed6dc8aa19400d",
+  "files": "Unmodified web/viewer.html, web/viewer.css, web/viewer.mjs, web/images and web/locale from the official legacy release. LICENSE matches pdfjs-dist. Core, worker and document assets come from the matching npm package."
+}

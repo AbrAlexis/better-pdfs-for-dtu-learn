@@ -8,12 +8,17 @@ const manifest = JSON.parse(await readFile("src/manifest.json", "utf8"));
 const pkg = JSON.parse(await readFile("package.json", "utf8"));
 const pdfPackage = JSON.parse(await readFile("node_modules/pdfjs-dist/package.json", "utf8"));
 const viewerSources = Object.fromEntries(await Promise.all(
-  ["viewer.html", "viewer.js", "viewer.css"].map(async file => [file, await readFile(`src/${file}`, "utf8")])
+  ["viewer.js", "viewer.css"].map(async file => [file, await readFile(`src/${file}`, "utf8")])
 ));
+const upstream = JSON.parse(await readFile("vendor/pdfjs/UPSTREAM.json", "utf8"));
+if (upstream.version !== pdfPackage.version) throw new Error("The standard viewer and pdfjs-dist must have the same version");
+const upstreamHTML = await readFile("vendor/pdfjs/web/viewer.html", "utf8");
+const upstreamJS = await readFile("vendor/pdfjs/web/viewer.mjs", "utf8");
+const upstreamCSS = await readFile("vendor/pdfjs/web/viewer.css", "utf8");
 // New HTML, JS and CSS always travel together, even when a browser keeps extension
 // resources cached across a temporary add-on reload.
-const revision = createHash("sha256").update(JSON.stringify({ viewerSources, pdfVersion: pdfPackage.version })).digest("hex").slice(0, 12);
-const viewerPage = `viewer.${revision}.html`;
+const revision = createHash("sha256").update(JSON.stringify({ viewerSources, upstreamHTML, upstreamJS, upstreamCSS, pdfVersion: pdfPackage.version })).digest("hex").slice(0, 12);
+const viewerPage = `vendor/web/viewer.${revision}.html`;
 
 for (const browser of ["chrome", "firefox"]) {
   const dest = `dist/${browser}`;
@@ -41,14 +46,33 @@ for (const browser of ["chrome", "firefox"]) {
     entryPoints: ["src/content.js"], outfile: `${dest}/content.js`, bundle: true,
     target: ["chrome132", "firefox140"], define: { __VIEWER_PAGE__: JSON.stringify(viewerPage) }
   });
-  await writeFile(`${dest}/${viewerPage}`, viewerSources["viewer.html"]
-    .replace('href="viewer.css"', `href="viewer.${revision}.css"`)
-    .replace('src="viewer.js"', `src="viewer.${revision}.js"`));
-  await writeFile(`${dest}/viewer.${revision}.js`, viewerSources["viewer.js"]);
-  await writeFile(`${dest}/viewer.${revision}.css`, viewerSources["viewer.css"]);
-  for (const file of ["build/pdf.mjs", "build/pdf.worker.mjs", "web/pdf_viewer.mjs", "web/pdf_viewer.css", "web/images", "cmaps", "standard_fonts", "wasm", "iccs", "LICENSE"]) {
+  await cp("vendor/pdfjs/web", `${dest}/vendor/web`, { recursive: true });
+  await rm(`${dest}/vendor/web/viewer.html`);
+  function replaceOnce(text, before, after) {
+    if (text.split(before).length !== 2) throw new Error(`Upstream viewer changed: ${before}`);
+    return text.replace(before, after);
+  }
+  let html = replaceOnce(upstreamHTML, '<title>PDF.js viewer</title>', '<title>DTU PDF Search</title>');
+  html = replaceOnce(html, 'src="viewer.mjs"', `src="bridge.${revision}.js"`);
+  html = replaceOnce(html, 'href="viewer.css"', `href="viewer.${revision}.css"`);
+  html = replaceOnce(html, '</head>', `<link rel="stylesheet" href="bridge.${revision}.css" /></head>`);
+  html = replaceOnce(html, '<div id="secondaryToolbarButtonContainer" class="menuContainer">',
+    `<div id="secondaryToolbarButtonContainer" class="menuContainer">
+      <a id="openOriginal" class="toolbarButton labeled" target="_blank" rel="noopener noreferrer" aria-disabled="true"><span>Open PDF in new tab</span></a>
+      <button id="useOriginal" class="toolbarButton labeled" type="button"><span>Use original viewer</span></button>`);
+  await writeFile(`${dest}/${viewerPage}`, html);
+  await writeFile(`${dest}/vendor/web/bridge.${revision}.js`, replaceOnce(viewerSources["viewer.js"], './viewer.mjs', `./viewer.${revision}.mjs`));
+  await writeFile(`${dest}/vendor/web/viewer.${revision}.mjs`, upstreamJS);
+  await rm(`${dest}/vendor/web/viewer.mjs`);
+  await writeFile(`${dest}/vendor/web/bridge.${revision}.css`, viewerSources["viewer.css"]);
+  await writeFile(`${dest}/vendor/web/viewer.${revision}.css`, upstreamCSS);
+  await rm(`${dest}/vendor/web/viewer.css`);
+  for (const file of ["build/pdf.mjs", "build/pdf.worker.mjs", "LICENSE"]) {
     const source = file.endsWith(".mjs") ? `legacy/${file}` : file;
     await cp(`node_modules/pdfjs-dist/${source}`, `${dest}/vendor/${file}`, { recursive: true });
+  }
+  for (const asset of ["cmaps", "standard_fonts", "wasm", "iccs"]) {
+    await cp(`node_modules/pdfjs-dist/${asset}`, `${dest}/vendor/web/${asset}`, { recursive: true });
   }
   await writeFile(`${dest}/THIRD_PARTY_NOTICES.txt`, `Includes Mozilla PDF.js ${pdfPackage.version}, licensed under Apache-2.0. See vendor/LICENSE and license files within vendor asset directories.\n`);
   const files = {};

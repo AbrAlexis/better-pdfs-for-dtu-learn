@@ -1,5 +1,5 @@
 import { test, expect, chromium, firefox } from "@playwright/test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import net from "node:net";
@@ -97,7 +97,7 @@ function viewer(page) {
 
 test("page padding creates no outer overflow and outer scrolling cannot grow the viewer", async () => {
   const { page, errors } = await openFixture({ padded: true });
-  await expect(viewer(page).locator('#pageCount')).toHaveText('/ 40');
+  await expect(viewer(page).locator('#numPages')).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   await expect.poll(() => page.evaluate(() => document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight)).toBeLessThanOrEqual(1);
   const frame = page.locator('.dtu-pdf-search iframe');
   const initial = await frame.boundingBox();
@@ -120,40 +120,38 @@ test("page padding creates no outer overflow and outer scrolling cannot grow the
 test("Ctrl+F finds and highlights page 40 without visiting it; supports navigation and zoom", async ({}, info) => {
   const { page, errors } = await openFixture();
   const pdfFrame = viewer(page);
-  await expect(pdfFrame.locator("#pageCount")).toHaveText("/ 40");
-  await expect(pdfFrame.locator("#toolbar")).toHaveCSS("display", "flex");
-  await expect(pdfFrame.locator("#toolbar")).toHaveCSS("height", "36px");
-  await expect(pdfFrame.locator('#findToggle svg')).toHaveCSS('width', '16px');
+  await expect(pdfFrame.locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
+  await expect(pdfFrame.locator("#toolbarViewer")).toBeVisible();
   await expect(pdfFrame.locator("#pageNumber")).toHaveValue("1");
   await expect(pdfFrame.locator('.page[data-page-number="40"] canvas')).toHaveCount(0);
   await page.locator("h1").click();
   await page.keyboard.press("Control+f");
-  await expect(pdfFrame.getByRole("searchbox")).toBeFocused();
-  await pdfFrame.getByRole("searchbox").fill("Distant quasar needle");
-  await expect(pdfFrame.locator("#findStatus")).toHaveText("1 / 1");
+  await expect(pdfFrame.locator("#findInput")).toBeFocused();
+  await pdfFrame.locator("#findInput").fill("Distant quasar needle");
+  await expect(pdfFrame.locator("#findResultsCount")).toHaveText(/[\u2068\u2069]*1[\u2068\u2069]* of [\u2068\u2069]*1[\u2068\u2069]* match/);
   await expect(pdfFrame.locator("#pageNumber")).toHaveValue("40");
   await expect(pdfFrame.locator('.page[data-page-number="40"] .highlight.selected')).toContainText("Distant quasar needle");
-  await pdfFrame.getByRole("searchbox").press("Control+f");
+  await pdfFrame.locator("#findInput").press("Control+f");
   await expect(pdfFrame.locator("#findbar")).toBeHidden();
   await expect(pdfFrame.locator("#viewerContainer")).toBeFocused();
   await page.keyboard.press("Control+f");
-  await expect(pdfFrame.getByRole("searchbox")).toBeFocused();
-  await expect(pdfFrame.getByRole("searchbox")).toHaveValue("Distant quasar needle");
-  await expect(pdfFrame.locator("#toolbar")).toHaveCSS("height", "36px");
-  await page.screenshot({ path: info.outputPath("compact-toolbar.png") });
-  await pdfFrame.getByRole("searchbox").fill("Lecture notes");
-  await expect(pdfFrame.locator("#findStatus")).toHaveText("1 / 39");
-  await pdfFrame.getByRole("button", { name: "Next match", exact: true }).click();
-  await expect(pdfFrame.locator("#findStatus")).toHaveText("2 / 39");
-  await pdfFrame.getByRole("searchbox").press("Shift+Enter");
-  await expect(pdfFrame.locator("#findStatus")).toHaveText("1 / 39");
-  await pdfFrame.getByRole("searchbox").fill("nonexistent phrase");
-  await expect(pdfFrame.locator("#findStatus")).toContainText("No matches");
-  await pdfFrame.getByRole("searchbox").press("Escape");
+  await expect(pdfFrame.locator("#findInput")).toBeFocused();
+  await expect(pdfFrame.locator("#findInput")).toHaveValue("Distant quasar needle");
+  await expect(pdfFrame.locator("#toolbarViewer")).toBeVisible();
+  await page.screenshot({ path: info.outputPath("standard-toolbar.png") });
+  await pdfFrame.locator("#findInput").fill("Lecture notes");
+  await expect(pdfFrame.locator("#findResultsCount")).toHaveText(/[\u2068\u2069]*1[\u2068\u2069]* of [\u2068\u2069]*39[\u2068\u2069]* matches/);
+  await pdfFrame.locator("#findNextButton").click();
+  await expect(pdfFrame.locator("#findResultsCount")).toHaveText(/[\u2068\u2069]*2[\u2068\u2069]* of [\u2068\u2069]*39[\u2068\u2069]* matches/);
+  await pdfFrame.locator("#findInput").press("Shift+Enter");
+  await expect(pdfFrame.locator("#findResultsCount")).toHaveText(/[\u2068\u2069]*1[\u2068\u2069]* of [\u2068\u2069]*39[\u2068\u2069]* matches/);
+  await pdfFrame.locator("#findInput").fill("nonexistent phrase");
+  await expect(pdfFrame.locator("#findMsg")).toContainText("Phrase not found");
+  await pdfFrame.locator("#findInput").press("Escape");
   await expect(pdfFrame.locator("#findbar")).toBeHidden();
-  await pdfFrame.getByRole("combobox", { name: "Zoom", exact: true }).selectOption("1.5");
-  await expect(pdfFrame.locator("#scale")).toHaveValue("1.5");
-  await pdfFrame.getByLabel("PDF options", { exact: true }).click();
+  await pdfFrame.locator("#scaleSelect").selectOption("1.5");
+  await expect(pdfFrame.locator("#scaleSelect")).toHaveValue("1.5");
+  await pdfFrame.locator("#secondaryToolbarToggleButton").click();
   await pdfFrame.getByRole("button", { name: "Use original viewer", exact: true }).click();
   await expect(page.locator("d2l-pdf-viewer")).toBeVisible();
   await page.getByLabel("PDF options", { exact: true }).click();
@@ -163,10 +161,37 @@ test("Ctrl+F finds and highlights page 40 without visiting it; supports navigati
   await page.close();
 });
 
+test("standard sidebar, download and safe startup settings work", async ({}, info) => {
+  const { page, errors } = await openFixture();
+  const pdfFrame = viewer(page);
+  await expect(pdfFrame.locator("#scaleSelect")).toHaveValue("page-width");
+  await pdfFrame.locator("#viewsManagerToggleButton").click();
+  await expect(pdfFrame.locator("#viewsManager")).toBeVisible();
+  await expect(pdfFrame.locator("#thumbnailsView img").first()).toBeVisible();
+  await pdfFrame.locator("#viewsManagerToggleButton").click();
+  await expect(pdfFrame.locator("#viewsManager")).toBeHidden();
+  const downloaded = page.waitForEvent("download");
+  await pdfFrame.locator("#downloadButton").click();
+  const download = await downloaded;
+  expect(download.suggestedFilename()).toBe("lecture.pdf");
+  expect(await readFile(await download.path())).toEqual(pdf);
+  expect(await pdfFrame.locator("body").evaluate(() => {
+    const options = window.PDFViewerApplicationOptions;
+    return [options.get("enableScripting"), options.get("enableXfa"), options.get("annotationEditorMode")];
+  })).toEqual([false, false, -1]);
+  const manifest = JSON.parse(await readFile(`dist/${info.project.name}/manifest.json`, "utf8"));
+  expect(manifest.content_security_policy.extension_pages).not.toContain("'unsafe-eval'");
+  await pdfFrame.locator("#secondaryToolbarToggleButton").click();
+  await expect(pdfFrame.getByRole("link", { name: "Open PDF in new tab" })).toHaveAttribute("href", `${origin}/content/enforced/326354-course/lecture.pdf`);
+  await page.screenshot({ path: info.outputPath("standard-menu.png") });
+  expect(errors).toEqual([]);
+  await page.close();
+});
+
 test("falls back to the verified API when the direct URL returns HTML", async () => {
   const { page, errors } = await openFixture({ fallback: true });
-  await expect(viewer(page).locator("#pageCount")).toHaveText("/ 40");
-  await viewer(page).getByLabel("PDF options", { exact: true }).click();
+  await expect(viewer(page).locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
+  await viewer(page).locator("#secondaryToolbarToggleButton").click();
   await expect(viewer(page).getByRole("link", { name: "Open PDF in new tab" })).toHaveAttribute("href", `${origin}/d2l/api/le/1.38/326354/content/topics/1260091/file?stream=true`);
   expect(errors).toEqual([]);
   await page.close();
@@ -174,9 +199,9 @@ test("falls back to the verified API when the direct URL returns HTML", async ()
 
 test("loads a new document after a source change", async () => {
   const { page, errors } = await openFixture();
-  await expect(viewer(page).locator("#pageCount")).toHaveText("/ 40");
+  await expect(viewer(page).locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   await page.locator("d2l-pdf-viewer").evaluate(el => el.setAttribute("src", "/content/enforced/326354-course/second.pdf"));
-  await expect(viewer(page).locator("#pageCount")).toHaveText("/ 5");
+  await expect(viewer(page).locator("#numPages")).toHaveText(/of [\u2068\u2069]*5[\u2068\u2069]*/);
   await expect(page.locator(".dtu-pdf-search")).toHaveCount(1);
   expect(errors).toEqual([]);
   await page.close();
@@ -195,7 +220,7 @@ test("routes Ctrl+F from the outer course page into a nested lesson frame", asyn
   const { page, errors } = await openFixture({ nested: true });
   const lesson = page.frameLocator('iframe[title="Lesson"]');
   const pdfFrame = lesson.frameLocator(".dtu-pdf-search iframe");
-  await expect(pdfFrame.locator("#pageCount")).toHaveText("/ 40");
+  await expect(pdfFrame.locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   // The lesson frame is 900px tall: sizing must use the outer browser's visible
   // bottom, not the nested frame's full height or a fixed viewport percentage.
   for (const height of [720, 900, 600]) {
@@ -209,14 +234,14 @@ test("routes Ctrl+F from the outer course page into a nested lesson frame", asyn
   }
   await page.getByRole("heading", { name: "Course page" }).click();
   await page.keyboard.press("Control+f");
-  await expect(pdfFrame.getByRole("searchbox")).toBeFocused();
+  await expect(pdfFrame.locator("#findInput")).toBeFocused();
   await page.getByRole("heading", { name: "Course page" }).click();
   await page.keyboard.press("Control+f");
   await expect(pdfFrame.locator("#findbar")).toBeHidden();
   await page.getByRole("heading", { name: "Course page" }).click();
   await page.keyboard.press("Control+f");
-  await expect(pdfFrame.getByRole("searchbox")).toBeFocused();
-  await pdfFrame.getByRole("searchbox").fill("Distant quasar needle");
+  await expect(pdfFrame.locator("#findInput")).toBeFocused();
+  await pdfFrame.locator("#findInput").fill("Distant quasar needle");
   await expect(pdfFrame.locator("#pageNumber")).toHaveValue("40");
   expect(errors).toEqual([]);
   await page.close();
@@ -224,7 +249,7 @@ test("routes Ctrl+F from the outer course page into a nested lesson frame", asyn
 
 test("finds a viewer inside a late-attached shadow root and cleans up removed topics", async () => {
   const { page, errors } = await openFixture();
-  await expect(viewer(page).locator("#pageCount")).toHaveText("/ 40");
+  await expect(viewer(page).locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   await page.evaluate(() => {
     document.querySelector(".content-panel").remove();
     document.body.append(document.createElement("lesson-shell"));
@@ -234,7 +259,7 @@ test("finds a viewer inside a late-attached shadow root and cleans up removed to
     const shadow = document.querySelector("lesson-shell").attachShadow({ mode: "open" });
     shadow.innerHTML = '<d2l-pdf-viewer src="/content/enforced/326354-course/second.pdf">Original</d2l-pdf-viewer>';
   });
-  await expect(viewer(page).locator("#pageCount")).toHaveText("/ 5");
+  await expect(viewer(page).locator("#numPages")).toHaveText(/of [\u2068\u2069]*5[\u2068\u2069]*/);
   await page.locator("lesson-shell").evaluate(el => el.remove());
   // With no PDF present, the extension must leave browser Find alone.
   await expect.poll(() => page.evaluate(() => !window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, cancelable: true })))).toBe(false);
@@ -245,7 +270,7 @@ test("finds a viewer inside a late-attached shadow root and cleans up removed to
 test("loads inside the smart-curriculum frame when the portal enforces Trusted Types", async () => {
   const { page, errors } = await openFixture({ nested: true, trustedTypes: true });
   const pdfFrame = page.frameLocator('iframe[title="Lesson"]').frameLocator(".dtu-pdf-search iframe");
-  await expect(pdfFrame.locator("#pageCount")).toHaveText("/ 40");
+  await expect(pdfFrame.locator("#numPages")).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   expect(errors).toEqual([]);
   await page.close();
 });
@@ -255,20 +280,20 @@ test("original viewer initializes at its real size after switching back, includi
   const lesson = page.frameLocator('iframe[title="Lesson"]');
   const native = lesson.locator('d2l-pdf-viewer');
   const pdfFrame = lesson.frameLocator('.dtu-pdf-search iframe');
-  await expect(pdfFrame.locator('#pageCount')).toHaveText('/ 40');
+  await expect(pdfFrame.locator('#numPages')).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
   await expect(native).toHaveAttribute('data-painted', 'false');
   for (let i = 0; i < 2; i++) {
-    await pdfFrame.getByLabel('PDF options', { exact: true }).click();
+    await pdfFrame.locator('#secondaryToolbarToggleButton').click();
     await pdfFrame.getByRole('button', { name: 'Use original viewer', exact: true }).click();
     await expect(native).toHaveAttribute('data-painted', 'true');
     await expect(native.locator('canvas')).toBeVisible();
     await expect(lesson.getByRole('status')).toHaveText('Brightspace original viewer');
     await lesson.getByLabel('PDF options', { exact: true }).click();
     await lesson.getByRole('button', { name: 'Use searchable viewer', exact: true }).click();
-    await expect(pdfFrame.locator('#pageCount')).toHaveText('/ 40');
-    await pdfFrame.getByRole('button', { name: 'Find in PDF', exact: true }).click();
-    await pdfFrame.getByRole('searchbox').fill('Distant quasar needle');
-    await expect(pdfFrame.locator('#findStatus')).toHaveText('1 / 1');
+    await expect(pdfFrame.locator('#numPages')).toHaveText(/of [\u2068\u2069]*40[\u2068\u2069]*/);
+    await pdfFrame.locator('#viewFindButton').click();
+    await pdfFrame.locator('#findInput').fill('Distant quasar needle');
+    await expect(pdfFrame.locator('#findResultsCount')).toHaveText(/[\u2068\u2069]*1[\u2068\u2069]* of [\u2068\u2069]*1[\u2068\u2069]* match/);
   }
   expect(errors).toEqual([]);
   await page.close();
