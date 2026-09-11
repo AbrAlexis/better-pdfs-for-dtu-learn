@@ -14,8 +14,6 @@ Better PDFs for DTU Learn is an independent project and is not affiliated with o
 - Open the original PDF in a new tab.
 - Switch back to Brightspace's original viewer at any time.
 
-The pages sidebar starts closed, including when a PDF requests that it open automatically. On pages without an active PDF, the extension leaves the browser's normal Find command unchanged.
-
 ## Install the beta
 
 This project does not have a signed store release yet. Build output is available in `dist`, with shareable ZIP packages in `artifacts`.

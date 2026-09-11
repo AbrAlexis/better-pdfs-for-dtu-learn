@@ -55,6 +55,10 @@ for (const browser of ["chrome", "firefox"]) {
     browserManifest.minimum_chrome_version = "132";
   }
   await writeFile(`${dest}/manifest.json`, JSON.stringify(browserManifest, null, 2) + "\n");
+  await mkdir(`${dest}/icons`, { recursive: true });
+  for (const size of [16, 32, 48, 128]) {
+    await cp(`logo/icon-${size}.png`, `${dest}/icons/icon-${size}.png`);
+  }
   await build({
     entryPoints: ["src/content.js"], outfile: `${dest}/content.js`, bundle: true,
     target: ["chrome132", "firefox140"], define: { __VIEWER_PAGE__: JSON.stringify(viewerPage) }
