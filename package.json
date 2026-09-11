@@ -1,0 +1,23 @@
+{
+  "name": "dtu-pdf-search",
+  "version": "0.1.1",
+  "private": true,
+  "type": "module",
+  "description": "Full-document PDF search inside DTU Learn, for Chrome and Firefox.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "playwright test",
+    "lint:firefox": "web-ext lint --source-dir dist/firefox",
+    "check": "npm run build && npm test && npm run test:browser && npm run lint:firefox"
+  },
+  "dependencies": {
+    "pdfjs-dist": "6.3.289"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3",
+    "web-ext": "10.6.0"
+  }
+}

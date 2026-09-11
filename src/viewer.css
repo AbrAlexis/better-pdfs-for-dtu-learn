@@ -1,0 +1,60 @@
+:root { color-scheme: light; font: 12px/1.4 system-ui, sans-serif; color: #253044; background: #e5e7eb; }
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+button, input, select { font: inherit; }
+button, select { background: transparent; color: #253044; border: 1px solid transparent; border-radius: 4px; height: 28px; padding: 2px 6px; }
+button { cursor: pointer; min-width: 28px; flex: none; }
+button:hover:not(:disabled), summary:hover, .menu[open] summary { background: #e9edf4; }
+button:disabled { opacity: .4; cursor: default; }
+:focus-visible { outline: 2px solid #174f9b; outline-offset: 1px; }
+input[type="search"], input[type="number"] { border: 1px solid #d5d9df; border-radius: 4px; padding: 3px 6px; height: 26px; color: #253044; background: white; }
+#toolbar { display: flex; align-items: center; gap: 6px; flex: none; height: 36px; padding: 3px 6px; background: #f8f9fb; border-bottom: 1px solid #d5d9df; z-index: 1; }
+.controls { display: flex; flex: none; align-items: center; gap: 2px; min-width: 0; }
+.page-controls, .zoom-controls { padding-right: 6px; border-right: 1px solid #d5d9df; }
+#pageNumber { width: 42px; text-align: center; appearance: textfield; }
+#pageNumber::-webkit-inner-spin-button, #pageNumber::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+#pageCount { white-space: nowrap; padding-inline: 3px; }
+#findToggle { display: grid; place-items: center; padding: 5px; }
+#findToggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+#findToggle[aria-expanded="true"] { background: #e3ebf7; color: #174f9b; }
+#findbar { flex: 1; }
+#query { width: 160px; flex: 1; min-width: 65px; max-width: 280px; }
+#findStatus { white-space: nowrap; color: #536078; padding-inline: 4px; font-size: 11px; }
+.search-option { position: relative; display: grid; place-items: center; flex: none; width: 26px; height: 26px; cursor: pointer; }
+.search-option input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.search-option span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 4px; }
+.search-option input:checked + span { background: #dce8fa; color: #174f9b; }
+.search-option input:focus-visible + span { outline: 2px solid #174f9b; }
+.search-option:hover span { background: #e9edf4; }
+.menu { position: relative; margin-left: auto; flex: none; }
+.menu summary { list-style: none; cursor: pointer; text-align: center; font: 20px/28px system-ui; width: 28px; height: 28px; border-radius: 4px; }
+.menu summary::-webkit-details-marker { display: none; }
+.menu-items { position: absolute; right: 0; top: 32px; min-width: 200px; padding: 4px; border: 1px solid #d5d9df; border-radius: 6px; background: white; box-shadow: 0 4px 16px #25304420; }
+.menu-items a, .menu-items button { display: block; width: 100%; height: auto; padding: 8px 10px; border: 0; text-align: left; text-decoration: none; white-space: nowrap; color: #253044; border-radius: 3px; }
+.menu-items a:hover { background: #e9edf4; }
+.menu-items [aria-disabled="true"] { opacity: .4; pointer-events: none; }
+#documentArea { position: relative; flex: 1; min-height: 0; }
+#viewerContainer {
+  position: absolute;
+  /* Keep the PDF's scrollbar away from Brightspace's adjacent lesson scrollbar. */
+  inset: 0 14px 0 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+#loading { position: absolute; top: 24px; left: 16px; right: 16px; text-align: center; }
+[hidden] { display: none !important; }
+.pdfViewer .page { box-sizing: content-box; }
+@media (max-width: 760px) {
+  #toolbar:has(#findbar:not([hidden])) .zoom-controls { display: none; }
+}
+@media (max-width: 540px) {
+  #toolbar:has(#findbar:not([hidden])) .page-controls { display: none; }
+  #toolbar { gap: 3px; }
+}
+
+#scale {
+  &:hover {
+    background: #e9edf4;
+  }
+}
